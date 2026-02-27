@@ -1,0 +1,5 @@
+{
+  "name": "לוח בקרה במחוות ידיים",
+  "description": "לוח בקרה עתידני עם שעון, מזג אוויר וחדשות, הנשלט באמצעות מחוות ידיים וקול.",
+  "requestFramePermissions": ["camera", "microphone"]
+}
