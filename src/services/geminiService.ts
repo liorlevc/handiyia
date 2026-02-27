@@ -13,7 +13,7 @@ function getAi() {
 export async function getNews() {
   try {
     const response = await getAi().models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-2.0-flash",
       contents: "תן לי 5 כותרות חדשות מעניינות מהיום בעברית. תחזיר בפורמט JSON: { news: [{ title: string, summary: string }] }",
       config: {
         responseMimeType: "application/json",
@@ -29,7 +29,7 @@ export async function getNews() {
 export async function getWeather(location: string = "Tel Aviv") {
   try {
     const response = await getAi().models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-2.0-flash",
       contents: `מה מזג האוויר ב${location} כרגע? תן לי טמפרטורה ותיאור קצר בעברית. תחזיר בפורמט JSON: { temp: number, description: string }`,
       config: {
         responseMimeType: "application/json",
