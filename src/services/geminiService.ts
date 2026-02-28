@@ -1,11 +1,11 @@
 import { GoogleGenAI } from "@google/genai";
+import { GEMINI_API_KEY } from "../config/geminiKey";
 
 let aiInstance: GoogleGenAI | null = null;
 
 function getAi() {
   if (!aiInstance) {
-    const apiKey = process.env.GEMINI_API_KEY || '';
-    aiInstance = new GoogleGenAI({ apiKey });
+    aiInstance = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
   }
   return aiInstance;
 }
