@@ -11,7 +11,7 @@ import { drawConnectors, drawLandmarks } from '@mediapipe/drawing_utils';
 import {
   Clock, Cloud, Newspaper, Calendar, Hand,
   Settings, ChevronLeft, ChevronRight, AlertCircle,
-  Music, Mic, MicOff, Play, Pause, ShoppingBag,
+  Music, Mic, MicOff, Play, Pause, ShoppingBag, ImagePlus,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
@@ -27,6 +27,8 @@ interface Appointment {
   time: string;
   title: string;
 }
+
+const USER_PHOTO_STORAGE_KEY = 'handiyia.user-photo';
 
 // --- Components ---
 
@@ -159,9 +161,26 @@ export default function App() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [voiceCommand, setVoiceCommand] = useState('');
+  const [userPhotoDataUrl, setUserPhotoDataUrl] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      return window.localStorage.getItem(USER_PHOTO_STORAGE_KEY);
+    } catch {
+      return null;
+    }
+  });
+  const [showWelcomeCapture, setShowWelcomeCapture] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    try {
+      return !window.localStorage.getItem(USER_PHOTO_STORAGE_KEY);
+    } catch {
+      return true;
+    }
+  });
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const profileCaptureCanvasRef = useRef<HTMLCanvasElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const gestureState = useRef({ startX: 0, lastX: 0, startTime: 0, isTracking: false });
   const [handPosition, setHandPosition] = useState<{ x: number, y: number } | null>(null);
@@ -171,7 +190,9 @@ export default function App() {
   const fittingRoomRef = useRef<FittingRoomHandle>(null);
   // Ref that always holds latest activeWidget (avoids stale closures in MediaPipe callback)
   const activeWidgetRef = useRef(activeWidget);
+  const showWelcomeCaptureRef = useRef(showWelcomeCapture);
   useEffect(() => { activeWidgetRef.current = activeWidget; }, [activeWidget]);
+  useEffect(() => { showWelcomeCaptureRef.current = showWelcomeCapture; }, [showWelcomeCapture]);
 
   const FITTING_ROOM_INDEX = 5;
 
@@ -185,6 +206,57 @@ export default function App() {
     { id: 'fitting' as WidgetType, component: null, icon: <ShoppingBag /> },
   ], [isPlaying]);
 
+  const closeWelcomeCapture = useCallback(() => {
+    if (!userPhotoDataUrl) return;
+    setShowWelcomeCapture(false);
+  }, [userPhotoDataUrl]);
+
+  const openWelcomeCapture = useCallback(() => {
+    setShowWelcomeCapture(true);
+  }, []);
+
+  const captureWelcomePhoto = useCallback(() => {
+    if (!videoRef.current || !profileCaptureCanvasRef.current) {
+      setGestureStatus('המצלמה עדיין נטענת...');
+      return;
+    }
+
+    const video = videoRef.current;
+    if (!video.videoWidth || !video.videoHeight) {
+      setGestureStatus('המצלמה עדיין מתייצבת, נסו שוב בעוד רגע');
+      return;
+    }
+
+    const canvas = profileCaptureCanvasRef.current;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.save();
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    ctx.restore();
+
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+    setUserPhotoDataUrl(dataUrl);
+    setShowWelcomeCapture(false);
+    setGestureStatus('תמונת הפרופיל נשמרה ✅');
+
+    try {
+      window.localStorage.setItem(USER_PHOTO_STORAGE_KEY, dataUrl);
+    } catch (error) {
+      console.error('Could not persist profile photo:', error);
+    }
+  }, []);
+
+  const handleRequireUserPhoto = useCallback(() => {
+    setShowWelcomeCapture(true);
+    setGestureStatus('צלמו תמונת פרופיל כדי ליצור לוקים');
+  }, []);
+
   const triggerCooldown = (message: string) => {
     cooldown.current = true;
     setGestureStatus(message);
@@ -195,25 +267,25 @@ export default function App() {
   };
 
   const nextWidget = useCallback(() => {
-    if (cooldown.current) return;
+    if (cooldown.current || showWelcomeCaptureRef.current) return;
     setActiveWidget((prev) => (prev + 1) % widgets.length);
     triggerCooldown('החלקה שמאלה! ⬅️');
   }, [widgets.length]);
 
   const prevWidget = useCallback(() => {
-    if (cooldown.current) return;
+    if (cooldown.current || showWelcomeCaptureRef.current) return;
     setActiveWidget((prev) => (prev - 1 + widgets.length) % widgets.length);
     triggerCooldown('החלקה ימינה! ➡️');
   }, [widgets.length]);
 
   const handlePinch = useCallback(() => {
-    if (cooldown.current) return;
+    if (cooldown.current || showWelcomeCaptureRef.current) return;
     setShowCamera(prev => !prev);
     triggerCooldown('צביטה! מחליף תצוגת מצלמה 🤏');
   }, []);
 
   const handleFist = useCallback(() => {
-    if (cooldown.current) return;
+    if (cooldown.current || showWelcomeCaptureRef.current) return;
     setIsPlaying(prev => !prev);
     triggerCooldown('אגרוף! מנגן/עוצר מוזיקה ✊');
   }, []);
@@ -238,6 +310,7 @@ export default function App() {
       const transcript = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
       setVoiceCommand(`זיהוי קולי: "${transcript}"`);
       setTimeout(() => setVoiceCommand(''), 3000);
+      if (showWelcomeCaptureRef.current) return;
 
       if (transcript.includes('הבא') || transcript.includes('שמאלה')) nextWidget();
       else if (transcript.includes('קודם') || transcript.includes('ימינה')) prevWidget();
@@ -283,6 +356,12 @@ export default function App() {
 
       canvasCtx.save();
       canvasCtx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+      if (showWelcomeCaptureRef.current) {
+        setHandPosition(null);
+        gestureState.current.isTracking = false;
+        canvasCtx.restore();
+        return;
+      }
 
       if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
         const landmarks = results.multiHandLandmarks[0];
@@ -405,6 +484,7 @@ export default function App() {
     music: 'מוזיקה',
     fitting: 'מלתחה',
   };
+  const shouldShowCameraOverlay = showCamera || showWelcomeCapture;
 
   return (
     <div className="relative w-full h-screen bg-black text-white font-sans overflow-hidden flex flex-col" dir="rtl">
@@ -450,6 +530,19 @@ export default function App() {
             {isListening ? <Mic className="w-5 h-5 animate-pulse" /> : <MicOff className="w-5 h-5" />}
           </button>
           <button
+            onClick={openWelcomeCapture}
+            className="p-2 rounded-lg glass hover:bg-white/10 transition-colors"
+            title={userPhotoDataUrl ? "צילום תמונת פרופיל מחדש" : "צילום תמונת פרופיל"}
+          >
+            {userPhotoDataUrl ? (
+              <div className="w-5 h-5 rounded-full overflow-hidden border border-white/40">
+                <img src={userPhotoDataUrl} alt="User profile" className="w-full h-full object-cover" />
+              </div>
+            ) : (
+              <ImagePlus className="w-5 h-5" />
+            )}
+          </button>
+          <button
             onClick={() => setShowCamera(!showCamera)}
             className="p-2 rounded-lg glass hover:bg-white/10 transition-colors"
           >
@@ -488,7 +581,11 @@ export default function App() {
 
           {/* FittingRoom — always mounted to preserve state, shown/hidden via CSS */}
           <div className={cn("w-full h-full", activeWidget === FITTING_ROOM_INDEX ? "block" : "hidden")}>
-            <FittingRoom ref={fittingRoomRef} videoRef={videoRef} />
+            <FittingRoom
+              ref={fittingRoomRef}
+              userPhotoDataUrl={userPhotoDataUrl}
+              onRequireUserPhoto={handleRequireUserPhoto}
+            />
           </div>
 
           {/* Other widgets — animated */}
@@ -533,13 +630,18 @@ export default function App() {
         </AnimatePresence>
       </main>
 
+      <canvas ref={profileCaptureCanvasRef} className="hidden" />
+
       {/* Audio */}
       <audio ref={audioRef} src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" loop />
 
       {/* Camera Feed Overlay */}
       <div className={cn(
-        "fixed bottom-8 right-8 w-48 h-36 rounded-2xl overflow-hidden glass border-2 border-white/10 transition-all duration-500 z-50",
-        showCamera ? "opacity-100 scale-100" : "opacity-0 scale-90 pointer-events-none"
+        "fixed overflow-hidden transition-all duration-500 z-50",
+        showWelcomeCapture
+          ? "inset-0 w-full h-full rounded-none border-0"
+          : "bottom-8 right-8 w-48 h-36 rounded-2xl glass border-2 border-white/10",
+        shouldShowCameraOverlay ? "opacity-100 scale-100" : "opacity-0 scale-90 pointer-events-none"
       )}>
         <video
           ref={videoRef}
@@ -556,9 +658,11 @@ export default function App() {
           height={480}
           style={{ transform: 'scaleX(-1)' }}
         />
-        <div className="absolute bottom-2 left-2 text-[8px] font-mono text-white/50 bg-black/50 px-1 rounded">
-          LIVE FEED
-        </div>
+        {!showWelcomeCapture && (
+          <div className="absolute bottom-2 left-2 text-[8px] font-mono text-white/50 bg-black/50 px-1 rounded">
+            LIVE FEED
+          </div>
+        )}
       </div>
 
       {/* Loading Overlay */}
@@ -570,12 +674,45 @@ export default function App() {
             </div>
             <h2 className="text-3xl font-bold">ברוכים הבאים ל-Handiyia</h2>
             <p className="text-white/60 leading-relaxed">
-              אנא אשר גישה למצלמה. לאחר מכן, החלק את היד ימינה או שמאלה כדי לעבור בין מצבים,
-              ובמצב המלתחה — אגרוף יצלם אותך ויייצר לוק מגניב עם AI.
+              אנא אשר גישה למצלמה. לאחר מכן יופיע מסך פתיחה לצילום תמונת פרופיל חד-פעמית,
+              והתמונה הזו תשמש לכל יצירת לוקים בקטלוג.
             </p>
             <div className="flex items-center justify-center space-x-2 space-x-reverse text-amber-400 text-sm">
               <AlertCircle className="w-4 h-4" />
               <span>מומלץ להשתמש בתאורה טובה</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Welcome Profile Capture Overlay */}
+      {isCameraReady && showWelcomeCapture && (
+        <div className="fixed inset-0 bg-black/65 backdrop-blur-sm z-[120] flex items-center justify-center p-8 text-center">
+          <div className="max-w-xl w-full rounded-3xl glass border border-white/10 p-8 space-y-6" dir="rtl">
+            <h2 className="text-3xl font-bold">ברוכים הבאים 👋</h2>
+            <p className="text-white/70 leading-relaxed">
+              צלמו תמונת פרופיל פעם אחת בלבד. מעכשיו נשתמש בתמונה הזו לקריאות ה-AI של המלתחה,
+              בלי לצלם מחדש בכל פריט.
+            </p>
+            <div className="flex items-center justify-center space-x-2 space-x-reverse text-amber-300 text-sm">
+              <AlertCircle className="w-4 h-4" />
+              <span>התמונה נשמרת מקומית בדפדפן ותוכלו לצלם מחדש בכל רגע</span>
+            </div>
+            <div className="flex items-center justify-center gap-3 pt-2">
+              {userPhotoDataUrl && (
+                <button
+                  onClick={closeWelcomeCapture}
+                  className="px-5 py-3 rounded-2xl glass border border-white/20 text-sm font-bold hover:bg-white/10 transition-colors"
+                >
+                  המשך עם התמונה השמורה
+                </button>
+              )}
+              <button
+                onClick={captureWelcomePhoto}
+                className="px-6 py-3 rounded-2xl bg-white text-black font-bold text-sm hover:bg-white/90 transition-all active:scale-95 shadow-lg shadow-white/20"
+              >
+                צלם ושמור תמונה
+              </button>
             </div>
           </div>
         </div>

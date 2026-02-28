@@ -18,7 +18,7 @@ import { cn } from '../lib/utils';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-type FittingRoomPhase = 'catalog' | 'capturing' | 'generating' | 'results';
+type FittingRoomPhase = 'catalog' | 'generating' | 'results';
 
 export interface FittingRoomHandle {
   /** Called by App.tsx every MediaPipe frame with the current hand landmarks (or null) */
@@ -26,7 +26,8 @@ export interface FittingRoomHandle {
 }
 
 interface FittingRoomProps {
-  videoRef: React.RefObject<HTMLVideoElement | null>;
+  userPhotoDataUrl: string | null;
+  onRequireUserPhoto?: () => void;
 }
 
 // ── Gesture helpers ───────────────────────────────────────────────────────────
@@ -76,19 +77,16 @@ function isThumbsUp(lm: any[]): boolean {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const COUNTDOWN_SECONDS    = 3;
-const FIST_HOLD_MS         = 2000; // ms to hold fist in catalog before capture
 const FINGER_STABLE_FRAMES = 8;    // frames finger count must be stable before switching image
 const THUMBS_UP_FRAMES     = 10;   // frames thumbs-up must be stable before exiting results
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 const FittingRoom = forwardRef<FittingRoomHandle, FittingRoomProps>(
-  ({ videoRef }, ref) => {
+  ({ userPhotoDataUrl, onRequireUserPhoto }, ref) => {
 
   const [phase, setPhase]               = useState<FittingRoomPhase>('catalog');
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [countdown, setCountdown]       = useState<number | null>(null);
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
   const [generatedLooks, setGeneratedLooks] = useState<GeneratedLook[]>([]);
   const [selectedLookIndex, setSelectedLookIndex] = useState(0);
@@ -98,11 +96,9 @@ const FittingRoom = forwardRef<FittingRoomHandle, FittingRoomProps>(
 
   // Refs that must be readable inside processLandmarks without stale closures
   const phaseRef           = useRef<FittingRoomPhase>('catalog');
-  const captureCanvasRef   = useRef<HTMLCanvasElement>(null);
   const catalogCooldown           = useRef(false);
   const postResetCooldown         = useRef(false); // blocks catalog gestures right after a reset
   const requireOpenHandAfterReset = useRef(false); // user must open hand before fist triggers again
-  const fistStartTime      = useRef<number | null>(null); // catalog capture fist
   const thumbsUpBuffer     = useRef<number>(0);           // consecutive thumbs-up frames
   const fingerBuffer       = useRef<number[]>([]);
   const currentItemRef     = useRef<ClothingItem>(CATALOG[0]);
@@ -124,9 +120,7 @@ const FittingRoom = forwardRef<FittingRoomHandle, FittingRoomProps>(
     setCapturedPhoto(null);
     setGeneratedLooks([]);
     setSelectedLookIndex(0);
-    setCountdown(null);
     setThumbsUpProgress(0);
-    fistStartTime.current   = null;
     thumbsUpBuffer.current  = 0;
     fingerBuffer.current    = [];
     // Require user to open their hand before fist can trigger capture again
@@ -159,40 +153,6 @@ const FittingRoom = forwardRef<FittingRoomHandle, FittingRoomProps>(
   useEffect(() => { goNextRef.current = goNext; }, [goNext]);
   useEffect(() => { goPrevRef.current = goPrev; }, [goPrev]);
 
-  // ── Photo capture ────────────────────────────────────────────────────────
-
-  const startCapture = useCallback(() => {
-    if (phaseRef.current !== 'catalog') return;
-    setPhase('capturing');
-    setCountdown(COUNTDOWN_SECONDS);
-  }, []);
-
-  useEffect(() => {
-    if (countdown === null) return;
-    if (countdown === 0) { takePhoto(); return; }
-    const t = setTimeout(() => setCountdown(c => (c !== null ? c - 1 : null)), 1000);
-    return () => clearTimeout(t);
-  }, [countdown]);
-
-  const takePhoto = useCallback(() => {
-    if (!videoRef.current || !captureCanvasRef.current) return;
-    const video  = videoRef.current;
-    const canvas = captureCanvasRef.current;
-    canvas.width  = video.videoWidth  || 640;
-    canvas.height = video.videoHeight || 480;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.save();
-    ctx.translate(canvas.width, 0);
-    ctx.scale(-1, 1);
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    ctx.restore();
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
-    setCapturedPhoto(dataUrl);
-    setCountdown(null);
-    startGeneration(dataUrl);
-  }, [videoRef]);
-
   // ── Generation ───────────────────────────────────────────────────────────
 
   const startGeneration = useCallback(async (photoDataUrl: string) => {
@@ -207,6 +167,18 @@ const FittingRoom = forwardRef<FittingRoomHandle, FittingRoomProps>(
     setPhase('results');
     setSelectedLookIndex(0);
   }, []);
+
+  // ── Try-on trigger (uses stored onboarding photo) ───────────────────────
+
+  const startTryOn = useCallback(() => {
+    if (phaseRef.current !== 'catalog') return;
+    if (!userPhotoDataUrl) {
+      onRequireUserPhoto?.();
+      return;
+    }
+    setCapturedPhoto(userPhotoDataUrl);
+    startGeneration(userPhotoDataUrl);
+  }, [onRequireUserPhoto, startGeneration, userPhotoDataUrl]);
 
   // ── Imperative gesture handler (called from App.tsx every frame) ──────────
 
@@ -236,11 +208,11 @@ const FittingRoom = forwardRef<FittingRoomHandle, FittingRoomProps>(
         }
 
         if (fist) {
-          // Fist = start capture
+          // Fist = start try-on with saved onboarding photo
           swipeState.current.isTracking = false;
           if (!catalogCooldown.current) {
             catalogCooldown.current = true;
-            startCapture();
+            startTryOn();
             setTimeout(() => { catalogCooldown.current = false; }, 1200);
           }
         } else {
@@ -323,7 +295,7 @@ const FittingRoom = forwardRef<FittingRoomHandle, FittingRoomProps>(
 
       // All other phases — nothing to do
     },
-  }), [startCapture]);
+  }), [startTryOn]);
 
   // ── Share ────────────────────────────────────────────────────────────────
 
@@ -357,8 +329,6 @@ const FittingRoom = forwardRef<FittingRoomHandle, FittingRoomProps>(
 
   return (
     <div className="relative w-full h-full flex flex-col items-center justify-center overflow-hidden">
-      <canvas ref={captureCanvasRef} className="hidden" />
-
       <AnimatePresence mode="wait">
 
         {/* ── CATALOG ─────────────────────────────────────────────────────── */}
@@ -422,11 +392,11 @@ const FittingRoom = forwardRef<FittingRoomHandle, FittingRoomProps>(
                     <span className="text-xs text-white/30 mr-2">סצנות שיוצרו</span>
                   </div>
                   <button
-                    onClick={startCapture}
+                    onClick={startTryOn}
                     className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-white text-black font-bold text-sm hover:bg-white/90 transition-all active:scale-95 shadow-lg shadow-white/10"
                   >
                     <Camera className="w-5 h-5" />
-                    <span>✊ אגרוף = מדוד וירטואלית</span>
+                    <span>✊ אגרוף = צור לוקים</span>
                   </button>
                 </div>
               </motion.div>
@@ -441,47 +411,6 @@ const FittingRoom = forwardRef<FittingRoomHandle, FittingRoomProps>(
                 />
               ))}
             </div>
-          </motion.div>
-        )}
-
-        {/* ── CAPTURING ──────────────────────────────────────────────────── */}
-        {phase === 'capturing' && (
-          <motion.div
-            key="capturing"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="flex flex-col items-center justify-center space-y-8"
-          >
-            <div className="text-center" dir="rtl">
-              <p className="text-white/50 text-sm uppercase tracking-widest mb-2">מצלם עבור</p>
-              <h2 className="text-3xl font-bold">{currentItem.nameHe}</h2>
-            </div>
-            <div className="relative w-40 h-40">
-              <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-                <circle cx="50" cy="50" r="45" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="4" />
-                <motion.circle
-                  cx="50" cy="50" r="45" fill="none" stroke="white" strokeWidth="4"
-                  strokeLinecap="round"
-                  strokeDasharray={`${2 * Math.PI * 45}`}
-                  initial={{ strokeDashoffset: 0 }}
-                  animate={{ strokeDashoffset: 2 * Math.PI * 45 }}
-                  transition={{ duration: COUNTDOWN_SECONDS, ease: 'linear' }}
-                />
-              </svg>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <motion.span
-                  key={countdown}
-                  initial={{ scale: 1.5, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  className="text-6xl font-extrabold"
-                >
-                  {countdown}
-                </motion.span>
-              </div>
-            </div>
-            <p className="text-white/40 text-sm" dir="rtl">עמוד מול המצלמה בצורה טבעית</p>
-            <Camera className="w-8 h-8 text-white/30 animate-pulse" />
           </motion.div>
         )}
 
