@@ -150,7 +150,7 @@ function PageRouter() {
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -12 }}
         transition={{ duration: 0.18 }}
-        className="w-full"
+        className="w-full overflow-x-hidden"
       >
         {state.currentPage === 'catalog' && <CatalogPage />}
         {state.currentPage === 'camera' && <CameraPage />}
@@ -167,7 +167,7 @@ function PageRouter() {
 export default function App() {
   return (
     <AppProvider>
-      <div className="relative w-full min-h-dvh bg-[#22101c]" dir="rtl">
+      <div className="relative w-full min-h-dvh bg-[#22101c] overflow-x-hidden" dir="rtl">
         <PageRouter />
         <BottomNav />
       </div>
