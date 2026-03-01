@@ -3,12 +3,44 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useApp } from '../context/AppContext';
 import { generateAllLooks } from '../services/imagenService';
 
+// Map common color names (Hebrew/English) → CSS color
+const COLOR_MAP: Record<string, string> = {
+  שחור: '#111111', black: '#111111',
+  לבן: '#f5f5f5', white: '#f5f5f5',
+  אפור: '#9ca3af', gray: '#9ca3af', grey: '#9ca3af',
+  אדום: '#ef4444', red: '#ef4444',
+  כחול: '#3b82f6', blue: '#3b82f6',
+  כחול_כהה: '#1e3a5f', navy: '#1e3a5f',
+  ירוק: '#22c55e', green: '#22c55e',
+  צהוב: '#facc15', yellow: '#facc15',
+  כתום: '#f97316', orange: '#f97316',
+  סגול: '#a855f7', purple: '#a855f7',
+  ורוד: '#ec4899', pink: '#ec4899',
+  חום: '#92400e', brown: '#92400e',
+  בז: '#d4b483', beige: '#d4b483',
+  זית: '#84863a', olive: '#84863a',
+  מנטה: '#6ee7b7', mint: '#6ee7b7',
+  קרם: '#fef3c7', cream: '#fef3c7',
+  קורל: '#fb7185', coral: '#fb7185',
+  בורדו: '#7f1d1d', burgundy: '#7f1d1d',
+  "ג'ינס": '#4a6fa5', denim: '#4a6fa5',
+  פחם: '#374151', charcoal: '#374151',
+};
+
+function colorToCss(name: string): string {
+  const key = name.toLowerCase().replace(/\s+/g, '_');
+  return COLOR_MAP[name] ?? COLOR_MAP[key] ?? '#6b7280';
+}
+
 export default function ResultsPage() {
   const { state, dispatch } = useApp();
   const { selectedProduct: product, capturedPhoto, generatedLooks, selectedLookIndex } = state;
-  const [selectedSize, setSelectedSize] = useState(product?.sizes?.[1] ?? '');
+
+  const [selectedSize, setSelectedSize] = useState(product?.sizes?.[1] ?? product?.sizes?.[0] ?? '');
+  const [selectedColor, setSelectedColor] = useState(product?.colors?.[0] ?? '');
   const [addedToCart, setAddedToCart] = useState(false);
-  const [activeTab, setActiveTab] = useState<'photo' | 'original'>('photo');
+  const [activeTab, setActiveTab] = useState<'ai' | 'original'>('ai');
+  const [descExpanded, setDescExpanded] = useState(false);
 
   // Start generation when page mounts
   useEffect(() => {
@@ -22,16 +54,12 @@ export default function ResultsPage() {
     }));
     dispatch({ type: 'SET_GENERATED_LOOKS', looks: initial });
 
-    generateAllLooks(
-      capturedPhoto,
-      product,
-      (updated) => {
-        dispatch({ type: 'SET_GENERATED_LOOKS', looks: updated });
-      }
-    ).finally(() => {
+    generateAllLooks(capturedPhoto, product, (updated) => {
+      dispatch({ type: 'SET_GENERATED_LOOKS', looks: updated });
+    }).finally(() => {
       dispatch({ type: 'SET_GENERATING', isGenerating: false });
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const currentLook = generatedLooks[selectedLookIndex];
@@ -41,28 +69,21 @@ export default function ResultsPage() {
     if (!product || !selectedSize) return;
     dispatch({
       type: 'ADD_TO_CART',
-      item: {
-        product,
-        quantity: 1,
-        size: selectedSize,
-        color: product.colors[0],
-      },
+      item: { product, quantity: 1, size: selectedSize, color: selectedColor },
     });
     setAddedToCart(true);
-    setTimeout(() => setAddedToCart(false), 2000);
+    setTimeout(() => setAddedToCart(false), 2500);
   };
 
   if (!product || !capturedPhoto) {
     return (
       <div className="flex items-center justify-center h-dvh bg-[#22101c] text-white" dir="rtl">
-        <div className="text-center">
-          <span className="material-symbols-outlined text-slate-500 mb-4" style={{ fontSize: 60 }}>
-            checkroom
-          </span>
-          <p className="text-slate-400">לא נבחר פריט. חזרו לקטלוג.</p>
+        <div className="text-center px-6">
+          <span className="material-symbols-outlined text-slate-500 block mb-4" style={{ fontSize: 60 }}>checkroom</span>
+          <p className="text-slate-400 mb-4">לא נבחר פריט. חזרו לקטלוג.</p>
           <button
             onClick={() => dispatch({ type: 'NAVIGATE', page: 'catalog' })}
-            className="mt-4 px-6 py-2 bg-[#ee2bad] text-white rounded-full text-sm font-semibold"
+            className="px-6 py-2.5 bg-[#ee2bad] text-white rounded-full text-sm font-semibold"
           >
             חזרה לקטלוג
           </button>
@@ -72,269 +93,337 @@ export default function ResultsPage() {
   }
 
   return (
-    <div className="flex flex-col min-h-dvh bg-[#22101c]" dir="rtl">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-[#22101c]/90 backdrop-blur-md border-b border-[#ee2bad]/10 px-4 py-3 flex items-center justify-between">
-        <button
-          onClick={() => dispatch({ type: 'NAVIGATE', page: 'catalog' })}
-          className="p-2 hover:bg-[#ee2bad]/10 rounded-full"
-        >
-          <span className="material-symbols-outlined text-slate-300">arrow_forward_ios</span>
-        </button>
-        <h1 className="font-display text-base font-bold text-white italic">תוצאת מדידה</h1>
-        <button
-          onClick={() => {
-            if (currentLook?.imageDataUrl) {
-              const a = document.createElement('a');
-              a.href = currentLook.imageDataUrl;
-              a.download = `look-${product.id}.jpg`;
-              a.click();
-            }
-          }}
-          className="p-2 hover:bg-[#ee2bad]/10 rounded-full"
-        >
-          <span className="material-symbols-outlined text-slate-300">share</span>
-        </button>
-      </header>
+    <div className="flex flex-col h-dvh bg-[#22101c] overflow-hidden" dir="rtl">
 
-      <main className="flex-1 overflow-y-auto px-4 pb-56">
-        {/* AI badge */}
-        <div className="flex justify-center my-4">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#ee2bad]/20 border border-[#ee2bad]/30">
-            <span className="material-symbols-outlined text-[#ee2bad]" style={{ fontSize: 16 }}>
-              auto_awesome
-            </span>
-            <span className="text-xs font-semibold text-[#ee2bad] uppercase tracking-wider">
-              מעובד בטכנולוגיית AI
-            </span>
+      {/* ── TOP: Image panel ───────────────────────────────────────────────── */}
+      <div className="relative flex-shrink-0" style={{ height: '52vh' }}>
+
+        {/* Header overlay */}
+        <div className="absolute top-0 inset-x-0 z-20 flex items-center justify-between px-3 pt-3">
+          <button
+            onClick={() => dispatch({ type: 'NAVIGATE', page: 'catalog' })}
+            className="flex items-center justify-center w-9 h-9 rounded-full bg-black/40 backdrop-blur-md text-white"
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 20 }}>arrow_forward_ios</span>
+          </button>
+
+          {/* AI badge */}
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/40 backdrop-blur-md border border-[#ee2bad]/40">
+            <span className="material-symbols-outlined text-[#ee2bad]" style={{ fontSize: 14 }}>auto_awesome</span>
+            <span className="font-sans text-[10px] font-bold text-[#ee2bad] uppercase tracking-wider">Virtual Try-On AI</span>
           </div>
+
+          <button
+            onClick={() => {
+              if (currentLook?.imageDataUrl) {
+                const a = document.createElement('a');
+                a.href = currentLook.imageDataUrl;
+                a.download = `look-${product.id}.jpg`;
+                a.click();
+              }
+            }}
+            className="flex items-center justify-center w-9 h-9 rounded-full bg-black/40 backdrop-blur-md text-white"
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 20 }}>download</span>
+          </button>
         </div>
 
-        {/* Main result image */}
-        <div className="relative w-full aspect-[3/4] rounded-2xl overflow-hidden shadow-2xl shadow-[#ee2bad]/20 bg-[#2d1525]">
-          <AnimatePresence mode="wait">
-            {currentLook?.isLoading || !currentLook?.imageDataUrl ? (
-              <motion.div
-                key="loading"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="absolute inset-0 flex flex-col items-center justify-center gap-4"
-              >
-                {/* Animated pulse rings */}
-                <div className="relative w-24 h-24 flex items-center justify-center">
+        {/* Image */}
+        <AnimatePresence mode="wait">
+          {currentLook?.isLoading || !currentLook?.imageDataUrl ? (
+            <motion.div
+              key="loading"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-[#2d1525] flex flex-col items-center justify-center gap-3"
+            >
+              <img
+                src={capturedPhoto}
+                alt="צילום"
+                className="absolute inset-0 w-full h-full object-cover opacity-15 blur-sm"
+              />
+              <div className="relative z-10 flex flex-col items-center gap-3">
+                <div className="relative w-16 h-16 flex items-center justify-center">
                   <motion.div
-                    animate={{ scale: [1, 1.4, 1], opacity: [0.6, 0, 0.6] }}
+                    animate={{ scale: [1, 1.6, 1], opacity: [0.5, 0, 0.5] }}
                     transition={{ duration: 2, repeat: Infinity }}
-                    className="absolute w-24 h-24 rounded-full bg-[#ee2bad]/20"
+                    className="absolute w-16 h-16 rounded-full bg-[#ee2bad]/25"
                   />
                   <motion.div
-                    animate={{ scale: [1, 1.2, 1], opacity: [0.8, 0.2, 0.8] }}
-                    transition={{ duration: 2, repeat: Infinity, delay: 0.3 }}
-                    className="absolute w-16 h-16 rounded-full bg-[#ee2bad]/30"
+                    animate={{ scale: [1, 1.3, 1], opacity: [0.7, 0.1, 0.7] }}
+                    transition={{ duration: 2, repeat: Infinity, delay: 0.4 }}
+                    className="absolute w-10 h-10 rounded-full bg-[#ee2bad]/35"
                   />
-                  <span
-                    className="material-symbols-outlined text-[#ee2bad]"
-                    style={{ fontSize: 40 }}
-                  >
-                    auto_awesome
-                  </span>
+                  <span className="material-symbols-outlined text-[#ee2bad]" style={{ fontSize: 32 }}>auto_awesome</span>
                 </div>
-                <p className="font-sans text-white/60 text-sm font-medium">AI יוצר את הלוק שלך...</p>
-                {/* Show captured photo as placeholder */}
-                <img
-                  src={capturedPhoto}
-                  alt="צילום"
-                  className="absolute inset-0 w-full h-full object-cover opacity-20 blur-sm"
-                />
-              </motion.div>
-            ) : (
-              <motion.div
-                key={`look-${selectedLookIndex}`}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="absolute inset-0"
-              >
-                {/* Toggle: result vs original */}
-                <img
-                  src={activeTab === 'photo' ? currentLook.imageDataUrl : capturedPhoto}
-                  alt="תוצאה"
-                  className="w-full h-full object-cover"
-                />
+                <p className="font-sans text-white/70 text-sm font-semibold">AI יוצר את הלוק שלך...</p>
+                <p className="font-sans text-white/35 text-xs">אנחנו מלבישים אותך על {currentLook?.sceneLabel}</p>
+              </div>
+            </motion.div>
+          ) : (
+            <motion.div
+              key={`look-${selectedLookIndex}-${activeTab}`}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.3 }}
+              className="absolute inset-0"
+            >
+              <img
+                src={activeTab === 'ai' ? currentLook.imageDataUrl : capturedPhoto}
+                alt="תוצאה"
+                className="w-full h-full object-cover object-top"
+              />
+              {/* Status badge */}
+              <div className="absolute top-14 right-3 glass-panel px-2.5 py-1 rounded-full text-[9px] font-bold text-white flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                {activeTab === 'ai' ? 'לוק AI' : 'צילום מקורי'}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-                {/* Live badge */}
-                <div className="absolute top-3 right-3 glass-panel px-3 py-1 rounded-full text-[10px] font-bold text-white flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-                  {activeTab === 'photo' ? 'לוק AI' : 'צילום מקורי'}
-                </div>
-
-                {/* Scan line */}
-                <div className="absolute inset-x-0 h-px bg-[#ee2bad]/40 shadow-[0_0_12px_#ee2bad] top-1/2" />
-
-                {/* Toggle compare button */}
-                <button
-                  onClick={() => setActiveTab((t) => (t === 'photo' ? 'original' : 'photo'))}
-                  className="absolute bottom-4 left-1/2 -translate-x-1/2 glass-panel px-5 py-2 rounded-full text-xs font-semibold text-white border border-[#ee2bad]/40 flex items-center gap-2"
-                >
-                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>compare</span>
-                  {activeTab === 'photo' ? 'ראה צילום מקורי' : 'ראה לוק AI'}
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-
-        {/* Scene selector */}
-        {generatedLooks.length > 1 && (
-          <div className="flex gap-2 mt-4 overflow-x-auto hide-scrollbar pb-1">
-            {generatedLooks.map((look, i) => (
+        {/* Compare toggle — bottom of image */}
+        {!currentLook?.isLoading && currentLook?.imageDataUrl && (
+          <div className="absolute bottom-3 inset-x-0 flex justify-center z-20">
+            <div className="flex bg-black/50 backdrop-blur-md rounded-full p-1 gap-1 border border-white/10">
               <button
-                key={i}
-                onClick={() => dispatch({ type: 'SET_SELECTED_LOOK', index: i })}
-                className={`flex-shrink-0 flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all ${
-                  selectedLookIndex === i
-                    ? 'bg-[#ee2bad]/20 border border-[#ee2bad]/60'
-                    : 'bg-[#2d1525] border border-transparent'
+                onClick={() => setActiveTab('ai')}
+                className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
+                  activeTab === 'ai'
+                    ? 'bg-[#ee2bad] text-white shadow-md'
+                    : 'text-white/60'
                 }`}
               >
-                {look.isLoading ? (
-                  <motion.div
-                    animate={{ opacity: [0.4, 1, 0.4] }}
-                    transition={{ duration: 1.5, repeat: Infinity }}
-                    className="w-12 h-12 rounded-xl bg-[#ee2bad]/20"
-                  />
-                ) : look.imageDataUrl ? (
-                  <img
-                    src={look.imageDataUrl}
-                    alt={look.sceneLabel}
-                    className="w-12 h-12 rounded-xl object-cover"
-                  />
-                ) : (
-                  <div className="w-12 h-12 rounded-xl bg-slate-800 flex items-center justify-center">
-                    <span className="material-symbols-outlined text-slate-600" style={{ fontSize: 20 }}>
-                      broken_image
-                    </span>
-                  </div>
-                )}
-                <span className={`text-[10px] font-semibold ${selectedLookIndex === i ? 'text-[#ee2bad]' : 'text-slate-500'}`}>
-                  {look.sceneLabel}
-                </span>
+                לוק AI
               </button>
-            ))}
+              <button
+                onClick={() => setActiveTab('original')}
+                className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
+                  activeTab === 'original'
+                    ? 'bg-white/20 text-white shadow-md'
+                    : 'text-white/60'
+                }`}
+              >
+                צילום שלי
+              </button>
+            </div>
           </div>
         )}
+      </div>
 
-        {/* Product details */}
-        <div className="mt-5 flex flex-col gap-4">
-          <div className="flex justify-between items-start">
-            <div>
-              <span className="text-xs text-[#ee2bad] font-bold">{product.brand}</span>
-              <h2 className="font-display text-xl font-bold text-white mt-0.5">{product.name}</h2>
-              <p className="font-sans text-slate-400 text-xs mt-1">קולקציית אביב-קיץ 2025</p>
+      {/* ── BOTTOM: Product info card ──────────────────────────────────────── */}
+      <div className="flex-1 bg-[#1a0d16] rounded-t-3xl overflow-y-auto pb-32 border-t border-[#ee2bad]/15">
+
+        {/* Scene selector row */}
+        <div className="flex gap-2 px-4 pt-4 pb-3 overflow-x-auto hide-scrollbar">
+          {generatedLooks.map((look, i) => (
+            <button
+              key={i}
+              onClick={() => dispatch({ type: 'SET_SELECTED_LOOK', index: i })}
+              className={`flex-shrink-0 flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                selectedLookIndex === i
+                  ? 'bg-[#ee2bad] border-[#ee2bad] text-white'
+                  : 'bg-[#2d1525] border-[#ee2bad]/20 text-slate-400'
+              }`}
+            >
+              {look.isLoading ? (
+                <motion.span
+                  animate={{ opacity: [0.4, 1, 0.4] }}
+                  transition={{ duration: 1.2, repeat: Infinity }}
+                  className="w-2 h-2 rounded-full bg-current"
+                />
+              ) : (
+                <span className="material-symbols-outlined" style={{ fontSize: 13 }}>
+                  {look.imageDataUrl ? 'check_circle' : 'radio_button_unchecked'}
+                </span>
+              )}
+              {look.sceneLabel}
+            </button>
+          ))}
+        </div>
+
+        <div className="px-4 flex flex-col gap-5">
+
+          {/* Brand + name + price */}
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <span className="font-sans text-[11px] text-[#ee2bad] font-black uppercase tracking-widest">{product.brand}</span>
+              <h2 className="font-display text-xl font-bold text-white mt-0.5 leading-snug">{product.name}</h2>
+              <p className="font-sans text-slate-500 text-xs mt-1">קולקציה 2025</p>
             </div>
-            <div className="text-left">
-              <p className="text-2xl font-black text-[#ee2bad]">₪{product.price.toLocaleString()}</p>
+            <div className="text-left shrink-0">
+              <p className="text-2xl font-black text-[#ee2bad] leading-none">₪{product.price.toLocaleString()}</p>
               {product.originalPrice && (
-                <p className="text-xs text-slate-500 line-through text-left">
+                <p className="font-sans text-xs text-slate-500 line-through mt-1">
                   ₪{product.originalPrice.toLocaleString()}
                 </p>
+              )}
+              {product.originalPrice && (
+                <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-[10px] font-bold">
+                  {Math.round((1 - product.price / product.originalPrice) * 100)}% הנחה
+                </span>
               )}
             </div>
           </div>
 
-          {/* AI fit score */}
+          {/* AI fit score — shows when done */}
           {allDone && (
             <motion.div
-              initial={{ opacity: 0, y: 10 }}
+              initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              className="flex flex-col gap-2 p-4 rounded-2xl bg-[#ee2bad]/5 border border-[#ee2bad]/15"
+              className="flex items-center gap-3 p-3 rounded-2xl bg-[#ee2bad]/8 border border-[#ee2bad]/20"
             >
-              <div className="flex justify-between text-xs font-semibold">
-                <span className="text-slate-400">התאמת בד ומידות AI</span>
-                <span className="text-[#ee2bad]">מצוין (96%)</span>
-              </div>
-              <div className="h-1.5 w-full bg-[#2d1525] rounded-full overflow-hidden">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: '96%' }}
-                  transition={{ duration: 1, delay: 0.3 }}
-                  className="h-full bg-[#ee2bad] rounded-full"
-                />
+              <span className="material-symbols-outlined text-[#ee2bad] shrink-0" style={{ fontSize: 20 }}>
+                auto_awesome
+              </span>
+              <div className="flex-1 min-w-0">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="font-sans text-xs text-slate-400 font-semibold">התאמת AI</span>
+                  <span className="font-sans text-xs text-[#ee2bad] font-black">96% מצוין</span>
+                </div>
+                <div className="h-1.5 w-full bg-[#2d1525] rounded-full overflow-hidden">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: '96%' }}
+                    transition={{ duration: 1.2, delay: 0.2 }}
+                    className="h-full bg-gradient-to-r from-[#ee2bad] to-pink-400 rounded-full"
+                  />
+                </div>
               </div>
             </motion.div>
           )}
 
-          {/* Specs */}
-          <div className="flex gap-3">
-            <div className="flex-1 p-3 rounded-2xl border border-[#ee2bad]/15 bg-[#2d1525]/50 flex flex-col items-center gap-1">
-              <span className="text-[9px] text-slate-500 uppercase tracking-wider">מידה</span>
-              <select
-                value={selectedSize}
-                onChange={(e) => setSelectedSize(e.target.value)}
-                className="bg-transparent text-white text-sm font-bold text-center appearance-none cursor-pointer w-full"
-              >
-                {product.sizes.map((s) => (
-                  <option key={s} value={s} className="bg-[#22101c]">
-                    {s}
-                  </option>
-                ))}
-              </select>
+          {/* Size picker */}
+          <div>
+            <div className="flex items-center justify-between mb-2.5">
+              <span className="font-sans text-sm font-bold text-white">מידה</span>
+              <span className="font-sans text-xs text-[#ee2bad] font-semibold">מדריך מידות</span>
             </div>
-            <div className="flex-1 p-3 rounded-2xl border border-[#ee2bad]/15 bg-[#2d1525]/50 flex flex-col items-center gap-1">
-              <span className="text-[9px] text-slate-500 uppercase tracking-wider">צבע</span>
-              <div
-                className="w-5 h-5 rounded-full border border-white/20 mt-0.5"
-                style={{ backgroundColor: '#ee2bad' }}
-              />
-            </div>
-            <div className="flex-1 p-3 rounded-2xl border border-[#ee2bad]/15 bg-[#2d1525]/50 flex flex-col items-center gap-1">
-              <span className="text-[9px] text-slate-500 uppercase tracking-wider">מלאי</span>
-              <span className="text-green-400 text-sm font-bold">זמין</span>
+            <div className="flex flex-wrap gap-2">
+              {product.sizes.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setSelectedSize(s)}
+                  className={`min-w-[3rem] h-10 px-3 rounded-xl border text-sm font-bold transition-all ${
+                    selectedSize === s
+                      ? 'bg-[#ee2bad] border-[#ee2bad] text-white shadow-lg shadow-[#ee2bad]/25'
+                      : 'bg-[#2d1525] border-[#ee2bad]/20 text-slate-300 hover:border-[#ee2bad]/50'
+                  }`}
+                >
+                  {s}
+                </button>
+              ))}
             </div>
           </div>
+
+          {/* Color picker */}
+          {product.colors && product.colors.length > 0 && (
+            <div>
+              <div className="flex items-center justify-between mb-2.5">
+                <span className="font-sans text-sm font-bold text-white">
+                  צבע: <span className="text-[#ee2bad]">{selectedColor}</span>
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                {product.colors.map((color) => (
+                  <button
+                    key={color}
+                    onClick={() => setSelectedColor(color)}
+                    title={color}
+                    className="flex flex-col items-center gap-1.5"
+                  >
+                    <div
+                      className={`w-9 h-9 rounded-full border-2 transition-all ${
+                        selectedColor === color
+                          ? 'border-[#ee2bad] scale-110 shadow-lg shadow-[#ee2bad]/30'
+                          : 'border-white/20 hover:border-white/50'
+                      }`}
+                      style={{ backgroundColor: colorToCss(color) }}
+                    />
+                    <span className={`font-sans text-[9px] font-semibold ${selectedColor === color ? 'text-[#ee2bad]' : 'text-slate-500'}`}>
+                      {color}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Description */}
-          <p className="font-sans text-slate-400 text-sm leading-relaxed">{product.description}</p>
-        </div>
-      </main>
-
-      {/* Sticky action buttons — sits ABOVE the BottomNav (z-50) */}
-      <div className="fixed bottom-[80px] inset-x-0 px-4 pb-3 pt-6 bg-gradient-to-t from-[#22101c] via-[#22101c]/90 to-transparent z-[60]">
-        <div className="flex flex-col gap-2 max-w-md mx-auto">
-          {/* Add to cart + view cart row */}
-          <div className="flex gap-3">
-            <motion.button
-              whileTap={{ scale: 0.97 }}
-              onClick={handleAddToCart}
-              className={`flex-[2] h-14 rounded-2xl font-bold text-base shadow-lg flex items-center justify-center gap-2 transition-colors ${
-                addedToCart
-                  ? 'bg-green-500 shadow-green-500/30'
-                  : 'bg-[#ee2bad] shadow-[#ee2bad]/30'
-              }`}
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
-                {addedToCart ? 'check_circle' : 'shopping_bag'}
-              </span>
-              {addedToCart ? 'נוסף לעגלה! ✓' : 'הוסף לעגלת קניות'}
-            </motion.button>
+          <div className="rounded-2xl bg-[#2d1525]/60 border border-[#ee2bad]/10 p-4">
             <button
-              onClick={() => dispatch({ type: 'NAVIGATE', page: 'cart' })}
-              className="w-14 h-14 bg-[#2d1525] rounded-2xl flex items-center justify-center border border-[#ee2bad]/25 shrink-0"
+              onClick={() => setDescExpanded((v) => !v)}
+              className="w-full flex items-center justify-between mb-2"
             >
-              <span className="material-symbols-outlined text-[#ee2bad]" style={{ fontSize: 22 }}>shopping_cart</span>
+              <span className="font-sans text-sm font-bold text-white">תיאור המוצר</span>
+              <span className="material-symbols-outlined text-slate-400 transition-transform" style={{ fontSize: 18, transform: descExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+                expand_more
+              </span>
             </button>
+            <p className={`font-sans text-slate-400 text-sm leading-relaxed transition-all ${descExpanded ? '' : 'line-clamp-2'}`}>
+              {product.description}
+            </p>
           </div>
 
-          {/* Go back button */}
+          {/* Stock + delivery badges */}
+          <div className="flex gap-2">
+            <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-green-500/10 border border-green-500/20">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+              <span className="font-sans text-xs text-green-400 font-semibold">במלאי</span>
+            </div>
+            <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#2d1525] border border-[#ee2bad]/15">
+              <span className="material-symbols-outlined text-slate-400" style={{ fontSize: 14 }}>local_shipping</span>
+              <span className="font-sans text-xs text-slate-400 font-semibold">משלוח חינם</span>
+            </div>
+            <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#2d1525] border border-[#ee2bad]/15">
+              <span className="material-symbols-outlined text-slate-400" style={{ fontSize: 14 }}>replay</span>
+              <span className="font-sans text-xs text-slate-400 font-semibold">החזרה 30 יום</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      {/* ── FIXED BOTTOM: Action buttons ──────────────────────────────────── */}
+      <div className="fixed bottom-[80px] inset-x-0 px-4 pt-4 pb-2 bg-gradient-to-t from-[#1a0d16] via-[#1a0d16]/95 to-transparent z-[60]">
+        <div className="flex gap-3 max-w-md mx-auto">
+          {/* Back */}
           <button
             onClick={() => dispatch({ type: 'NAVIGATE', page: 'catalog' })}
-            className="w-full h-11 rounded-2xl flex items-center justify-center gap-2 text-slate-400 text-sm font-semibold bg-[#2d1525]/60 border border-white/5 hover:text-white transition-colors"
+            className="w-12 h-13 shrink-0 flex items-center justify-center rounded-2xl bg-[#2d1525] border border-[#ee2bad]/20 text-slate-300"
           >
-            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>arrow_forward_ios</span>
-            חזרה לקטלוג
+            <span className="material-symbols-outlined" style={{ fontSize: 22 }}>arrow_forward_ios</span>
+          </button>
+
+          {/* Add to cart */}
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            onClick={handleAddToCart}
+            className={`flex-1 h-13 rounded-2xl font-bold text-base shadow-lg flex items-center justify-center gap-2 transition-colors ${
+              addedToCart
+                ? 'bg-green-500 shadow-green-500/25'
+                : 'bg-[#ee2bad] shadow-[#ee2bad]/25'
+            }`}
+            style={{ height: '3.25rem' }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
+              {addedToCart ? 'check_circle' : 'shopping_bag'}
+            </span>
+            {addedToCart ? 'נוסף לעגלה! ✓' : 'הוסף לעגלה'}
+          </motion.button>
+
+          {/* Cart shortcut */}
+          <button
+            onClick={() => dispatch({ type: 'NAVIGATE', page: 'cart' })}
+            className="w-12 shrink-0 flex items-center justify-center rounded-2xl bg-[#2d1525] border border-[#ee2bad]/20"
+            style={{ height: '3.25rem' }}
+          >
+            <span className="material-symbols-outlined text-[#ee2bad]" style={{ fontSize: 22 }}>shopping_cart</span>
           </button>
         </div>
       </div>
+
     </div>
   );
 }
