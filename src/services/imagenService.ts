@@ -4,7 +4,8 @@
  */
 
 import { GoogleGenAI } from "@google/genai";
-import type { ClothingItem, Scene } from "../data/catalog";
+import type { Product } from "../data/products";
+import type { GeneratedLookState } from "../context/AppContext";
 
 let aiInstance: GoogleGenAI | null = null;
 
@@ -16,25 +17,14 @@ function getAi() {
   return aiInstance;
 }
 
-export interface GeneratedLook {
-  scene: Scene;
-  imageBase64: string;
-  isLoading: boolean;
-  error?: string;
-}
-
-/**
- * Converts a base64 data URL to a plain base64 string + mimeType.
- */
+/** Converts a base64 data URL to plain base64 + mimeType */
 function dataUrlToBase64(dataUrl: string): { data: string; mimeType: string } {
   const [header, data] = dataUrl.split(',');
   const mimeType = header.match(/:(.*?);/)?.[1] ?? 'image/jpeg';
   return { data, mimeType };
 }
 
-/**
- * Fetches an external image URL and converts it to base64 inline data.
- */
+/** Fetches an external image URL and converts it to base64 inline data */
 async function fetchImageAsBase64(url: string): Promise<{ data: string; mimeType: string }> {
   const response = await fetch(url);
   const blob = await response.blob();
@@ -50,136 +40,120 @@ async function fetchImageAsBase64(url: string): Promise<{ data: string; mimeType
 }
 
 /**
- * Generates a lifestyle fashion image of the user wearing the EXACT catalog item,
- * using both the user's photo and the catalog item's image as visual references.
+ * Generates a single lifestyle fashion photo of the user wearing the catalog item.
  */
 export async function generateLook(
   userPhotoDataUrl: string,
-  item: ClothingItem,
-  scene: Scene
+  product: Product,
+  scene: { id: string; label: string; prompt: string }
 ): Promise<string> {
   const ai = getAi();
-
   const userPhoto = dataUrlToBase64(userPhotoDataUrl);
+  const outfitPhoto = await fetchImageAsBase64(product.image);
 
-  // Fetch the catalog item image as base64 so Gemini sees the exact garment
-  const outfitPhoto = await fetchImageAsBase64(item.imageUrl);
-
-  const prompt = `You are a professional fashion photographer and AI stylist.
+  const prompt = `You are a professional fashion photographer and AI stylist working for a luxury fashion app.
 
 I am giving you TWO reference images:
 1. PERSON PHOTO — the exact person who wants to try on the outfit
-2. OUTFIT PHOTO — the exact clothing item from our catalog
+2. OUTFIT PHOTO — the exact clothing item from the catalog
 
 Your task: Generate a single high-quality, photorealistic lifestyle fashion photo of THIS EXACT PERSON (from image 1) wearing the clothing item extracted from the OUTFIT PHOTO (image 2).
-The person in the final image must be the person from image 1 — NOT the model or mannequin shown in image 2.
 
 The photo should be set in: ${scene.prompt}
 
-CRITICAL — preserve ALL of the following from the PERSON PHOTO exactly as they are:
-- Face: same facial features, face shape, expression style
-- Facial hair: same beard, stubble, or clean-shaven — do NOT add or remove beard/stubble
-- Hair: exact same hair color, length, style, and texture
-- Body: same body type, build, height proportions, weight — do NOT slim down or bulk up the body
-- Skin tone: exact same complexion and skin color
+CRITICAL — preserve ALL of the following from the PERSON PHOTO exactly as they appear:
+- Face: same facial features, face shape, skin texture, expression style
+- Facial hair: exact same beard, stubble, or clean-shaven look — do NOT add, remove, or trim beard/stubble
+- Hair: exact same hair color, length, style, texture, and hairline
+- Body: same body type, build, height proportions, and weight — do NOT slim down, bulk up, or change body shape
+- Skin tone: exact same complexion, undertone, and skin color
 - Age appearance: same apparent age — do NOT make the person look younger or older
-- Ethnicity: must match exactly
+- Ethnicity: must match exactly — no changes
 
 OUTFIT rules:
-- The OUTFIT PHOTO may contain a model or mannequin wearing the garment — IGNORE that model/mannequin completely
-- Extract ONLY the clothing item itself from the OUTFIT PHOTO: its color, cut, fabric texture, pattern, and style
-- Place that exact garment on the PERSON from the PERSON PHOTO — not on the model from the outfit photo
-- Show the full outfit clearly (full or 3/4 body shot)
+- The OUTFIT PHOTO may contain a model, mannequin, or hanger — IGNORE that completely
+- Extract ONLY the clothing item itself: its color, cut, fabric texture, pattern, drape, and style details
+- Dress THIS PERSON (from the PERSON PHOTO) in that exact garment
+- Show full-body or 3/4 body shot so the outfit is clearly visible
+- Item: ${product.name} by ${product.brand}
 
-PHOTO quality:
-- Magazine-quality editorial photography
-- Natural, flattering lighting appropriate to ${scene.label}
-- The person looks confident, natural and stylish
-- Photorealistic — NOT illustrated, NOT cartoon-like
-- No text, logos, or watermarks in the image
+PHOTO quality requirements:
+- Magazine-quality editorial/lookbook photography
+- Natural, flattering lighting appropriate for: ${scene.label}
+- The person looks confident, natural, and stylish
+- Background matches the scene description
+- Photorealistic — NOT illustrated, NOT cartoon, NOT CGI-looking
+- No text, watermarks, logos, or graphic overlays in the final image
+- Sharp, crisp image with professional color grading
 
-The result must look like a real photo of THIS SPECIFIC PERSON wearing that outfit in that location.`;
+The result must look like a real high-end fashion photo shoot of THIS SPECIFIC PERSON wearing that outfit.`;
 
-  try {
-    const response = await ai.models.generateContent({
+  const response = await ai.models.generateContent({
       model: "gemini-3.1-flash-image-preview",
-      contents: [
-        {
-          role: "user",
-          parts: [
-            // Image 1: the person
-            {
-              inlineData: {
-                mimeType: userPhoto.mimeType,
-                data: userPhoto.data,
-              },
-            },
-            { text: "PERSON PHOTO — this is the person who wants to try on the outfit:" },
-            // Image 2: the exact outfit from the catalog
-            {
-              inlineData: {
-                mimeType: outfitPhoto.mimeType,
-                data: outfitPhoto.data,
-              },
-            },
-            { text: `OUTFIT PHOTO — this is the EXACT clothing item to use (${item.name} by ${item.brand}):` },
-            // The actual generation prompt
-            { text: prompt },
-          ],
-        },
-      ],
-      config: {
-        responseModalities: ["IMAGE", "TEXT"],
+    contents: [
+      {
+        role: "user",
+        parts: [
+          {
+            inlineData: { mimeType: userPhoto.mimeType, data: userPhoto.data },
+          },
+          { text: "PERSON PHOTO — this is the exact person who wants to try on the outfit:" },
+          {
+            inlineData: { mimeType: outfitPhoto.mimeType, data: outfitPhoto.data },
+          },
+          { text: `OUTFIT PHOTO — this is the exact clothing item (${product.name} by ${product.brand}):` },
+          { text: prompt },
+        ],
       },
-    });
+    ],
+    config: {
+      responseModalities: ["IMAGE", "TEXT"],
+    },
+  });
 
-    const parts = response.candidates?.[0]?.content?.parts;
-    if (!parts) throw new Error("No response parts");
+  const parts = response.candidates?.[0]?.content?.parts;
+  if (!parts) throw new Error("No response parts from Gemini");
 
-    for (const part of parts) {
-      if (part.inlineData?.data) {
-        return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-      }
+  for (const part of parts) {
+    if (part.inlineData?.data) {
+      return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
     }
-
-    throw new Error("No image in response");
-  } catch (error) {
-    console.error(`Error generating look for scene ${scene.id}:`, error);
-    throw error;
   }
+
+  throw new Error("No image returned in Gemini response");
 }
 
 /**
- * Generates all 4 lifestyle looks for a given user photo and clothing item.
- * Returns results progressively via callback.
+ * Generates all lifestyle looks for a product.
+ * Calls onProgress after each look completes so the UI can update progressively.
  */
 export async function generateAllLooks(
   userPhotoDataUrl: string,
-  item: ClothingItem,
-  onProgress: (results: GeneratedLook[]) => void
-): Promise<GeneratedLook[]> {
-  const results: GeneratedLook[] = item.scenes.map((scene) => ({
-    scene,
-    imageBase64: '',
+  product: Product,
+  onProgress: (results: GeneratedLookState[]) => void
+): Promise<GeneratedLookState[]> {
+  const results: GeneratedLookState[] = product.scenes.map((s) => ({
+    sceneLabel: s.label,
+    imageDataUrl: '',
     isLoading: true,
   }));
 
   onProgress([...results]);
 
-  // Generate all scenes in parallel
   await Promise.allSettled(
-    item.scenes.map(async (scene, index) => {
+    product.scenes.map(async (scene, index) => {
       try {
-        const imageDataUrl = await generateLook(userPhotoDataUrl, item, scene);
+        const imageDataUrl = await generateLook(userPhotoDataUrl, product, scene);
         results[index] = {
-          scene,
-          imageBase64: imageDataUrl,
+          sceneLabel: scene.label,
+          imageDataUrl,
           isLoading: false,
         };
       } catch (error) {
+        console.error(`Error generating look for scene ${scene.id}:`, error);
         results[index] = {
-          scene,
-          imageBase64: '',
+          sceneLabel: scene.label,
+          imageDataUrl: '',
           isLoading: false,
           error: 'שגיאה בייצור התמונה',
         };
