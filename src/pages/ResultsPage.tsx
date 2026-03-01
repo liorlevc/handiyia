@@ -97,7 +97,7 @@ export default function ResultsPage() {
         </button>
       </header>
 
-      <main className="flex-1 overflow-y-auto px-4 pb-40">
+      <main className="flex-1 overflow-y-auto px-4 pb-56">
         {/* AI badge */}
         <div className="flex justify-center my-4">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#ee2bad]/20 border border-[#ee2bad]/30">
@@ -298,28 +298,40 @@ export default function ResultsPage() {
         </div>
       </main>
 
-      {/* Sticky action buttons */}
-      <div className="fixed bottom-0 inset-x-0 p-4 bg-gradient-to-t from-[#22101c] via-[#22101c]/95 to-transparent z-40 pb-8">
-        <div className="flex gap-3 max-w-md mx-auto">
-          <motion.button
-            whileTap={{ scale: 0.97 }}
-            onClick={handleAddToCart}
-            className={`flex-[2] h-14 rounded-2xl font-bold text-lg shadow-lg flex items-center justify-center gap-2 transition-colors ${
-              addedToCart
-                ? 'bg-green-500 shadow-green-500/30'
-                : 'bg-[#ee2bad] shadow-[#ee2bad]/30'
-            }`}
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: 22 }}>
-              {addedToCart ? 'check_circle' : 'shopping_bag'}
-            </span>
-            {addedToCart ? 'נוסף לעגלה!' : 'הוסף לעגלת קניות'}
-          </motion.button>
+      {/* Sticky action buttons — sits ABOVE the BottomNav (z-50) */}
+      <div className="fixed bottom-[80px] inset-x-0 px-4 pb-3 pt-6 bg-gradient-to-t from-[#22101c] via-[#22101c]/90 to-transparent z-[60]">
+        <div className="flex flex-col gap-2 max-w-md mx-auto">
+          {/* Add to cart + view cart row */}
+          <div className="flex gap-3">
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={handleAddToCart}
+              className={`flex-[2] h-14 rounded-2xl font-bold text-base shadow-lg flex items-center justify-center gap-2 transition-colors ${
+                addedToCart
+                  ? 'bg-green-500 shadow-green-500/30'
+                  : 'bg-[#ee2bad] shadow-[#ee2bad]/30'
+              }`}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
+                {addedToCart ? 'check_circle' : 'shopping_bag'}
+              </span>
+              {addedToCart ? 'נוסף לעגלה! ✓' : 'הוסף לעגלת קניות'}
+            </motion.button>
+            <button
+              onClick={() => dispatch({ type: 'NAVIGATE', page: 'cart' })}
+              className="w-14 h-14 bg-[#2d1525] rounded-2xl flex items-center justify-center border border-[#ee2bad]/25 shrink-0"
+            >
+              <span className="material-symbols-outlined text-[#ee2bad]" style={{ fontSize: 22 }}>shopping_cart</span>
+            </button>
+          </div>
+
+          {/* Go back button */}
           <button
-            onClick={() => dispatch({ type: 'NAVIGATE', page: 'cart' })}
-            className="flex-1 h-14 bg-[#2d1525] rounded-2xl font-bold text-white flex items-center justify-center border border-[#ee2bad]/20"
+            onClick={() => dispatch({ type: 'NAVIGATE', page: 'catalog' })}
+            className="w-full h-11 rounded-2xl flex items-center justify-center gap-2 text-slate-400 text-sm font-semibold bg-[#2d1525]/60 border border-white/5 hover:text-white transition-colors"
           >
-            <span className="material-symbols-outlined text-[#ee2bad]">shopping_cart</span>
+            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>arrow_forward_ios</span>
+            חזרה לקטלוג
           </button>
         </div>
       </div>
