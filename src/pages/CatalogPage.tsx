@@ -64,7 +64,7 @@ export default function CatalogPage() {
             </span>
           </button>
 
-          <h1 className="text-xl font-bold tracking-tight text-white" style={{ fontFamily: "'Playfair Display', Georgia, serif", fontStyle: 'italic' }}>קטלוג מותגים</h1>
+          <h1 className="font-display text-xl font-bold tracking-tight text-white italic">קטלוג מותגים</h1>
 
           <button
             onClick={() => dispatch({ type: 'NAVIGATE', page: 'cart' })}
@@ -122,7 +122,7 @@ export default function CatalogPage() {
         {/* Featured Brands */}
         <section className="mb-6">
           <div className="flex items-center justify-between px-4 mb-3 mt-2">
-            <h2 className="text-base font-bold text-white" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>מותגים נבחרים</h2>
+            <h2 className="font-display text-base font-bold text-white">מותגים נבחרים</h2>
             <button
               onClick={() => setActiveBrand(null)}
               className="text-[#ee2bad] text-xs font-semibold"
@@ -166,7 +166,7 @@ export default function CatalogPage() {
         {/* Product Grid */}
         <section className="px-4">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-base font-bold text-white" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+            <h2 className="font-display text-base font-bold text-white">
               {activeBrand
                 ? BRANDS.find((b) => b.id === activeBrand)?.name
                 : 'קולקציה חדשה'}
@@ -227,7 +227,7 @@ export default function CatalogPage() {
                   {/* Info */}
                   <div className="flex flex-col gap-1">
                     <span className="text-xs text-[#ee2bad] font-bold">{product.brand}</span>
-                    <h3 className="text-sm font-semibold text-white line-clamp-1">{product.name}</h3>
+                    <h3 className="font-display text-sm font-semibold text-white line-clamp-1">{product.name}</h3>
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className="font-bold text-white">
                         ₪{product.price.toLocaleString()}

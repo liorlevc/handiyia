@@ -168,9 +168,9 @@ export default function CameraPage() {
         </button>
 
         <div className="flex-1 text-center">
-          <h2 className="text-white text-base font-bold">צילום למדידה</h2>
+          <h2 className="font-display text-white text-base font-bold italic">צילום למדידה</h2>
           {product && (
-            <p className="text-[#ee2bad] text-xs font-medium">{product.name} — {product.brand}</p>
+            <p className="font-sans text-[#ee2bad] text-xs font-medium">{product.name} — {product.brand}</p>
           )}
         </div>
 
@@ -189,8 +189,8 @@ export default function CameraPage() {
           animate={{ opacity: 1, y: 0 }}
           className="relative z-10 flex flex-col items-center pt-4 px-6 text-center"
         >
-          <h3 className="text-white text-2xl font-bold drop-shadow-lg" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>עמדו מול המצלמה</h3>
-          <p className="text-slate-200 text-sm mt-1 drop-shadow-sm">ודאו שכל הגוף נראה בפריים</p>
+          <h3 className="font-display text-white text-2xl font-bold drop-shadow-lg">עמדו מול המצלמה</h3>
+          <p className="font-sans text-slate-200 text-sm mt-1 drop-shadow-sm">ודאו שכל הגוף נראה בפריים</p>
         </motion.div>
       )}
 
@@ -269,7 +269,7 @@ export default function CameraPage() {
         </div>
 
         <div className="text-center">
-          <span className="text-white/50 text-xs font-bold uppercase tracking-widest">
+          <span className="font-sans text-white/50 text-xs font-bold uppercase tracking-widest">
             {countdown !== null ? `מצלם בעוד ${countdown}...` : 'לחצו לצילום'}
           </span>
         </div>

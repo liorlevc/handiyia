@@ -123,8 +123,8 @@ export default function ProfilePage() {
             checkroom
           </span>
         </motion.div>
-        <h1 className="text-4xl font-bold tracking-tight text-white" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>ברוכים הבאים</h1>
-        <p className="mt-2 text-slate-400 text-base">
+        <h1 className="font-display text-4xl font-bold tracking-tight text-white">ברוכים הבאים</h1>
+        <p className="font-sans mt-2 text-slate-400 text-base">
           צרו פרופיל כדי להתחיל במדידה וירטואלית
         </p>
       </div>
@@ -186,7 +186,7 @@ export default function ProfilePage() {
 
         {/* Name input */}
         <div className="flex flex-col gap-2">
-          <label className="text-sm font-semibold text-slate-300">שם (אופציונלי)</label>
+          <label className="font-sans text-sm font-semibold text-slate-300">שם (אופציונלי)</label>
           <input
             type="text"
             value={name}

@@ -81,7 +81,7 @@ export default function ResultsPage() {
         >
           <span className="material-symbols-outlined text-slate-300">arrow_forward_ios</span>
         </button>
-        <h1 className="text-base font-bold text-white">תוצאת מדידה</h1>
+        <h1 className="font-display text-base font-bold text-white italic">תוצאת מדידה</h1>
         <button
           onClick={() => {
             if (currentLook?.imageDataUrl) {
@@ -140,7 +140,7 @@ export default function ResultsPage() {
                     auto_awesome
                   </span>
                 </div>
-                <p className="text-white/60 text-sm font-medium">AI יוצר את הלוק שלך...</p>
+                <p className="font-sans text-white/60 text-sm font-medium">AI יוצר את הלוק שלך...</p>
                 {/* Show captured photo as placeholder */}
                 <img
                   src={capturedPhoto}
@@ -229,8 +229,8 @@ export default function ResultsPage() {
           <div className="flex justify-between items-start">
             <div>
               <span className="text-xs text-[#ee2bad] font-bold">{product.brand}</span>
-              <h2 className="text-xl font-bold text-white mt-0.5" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>{product.name}</h2>
-              <p className="text-slate-400 text-xs mt-1">קולקציית אביב-קיץ 2025</p>
+              <h2 className="font-display text-xl font-bold text-white mt-0.5">{product.name}</h2>
+              <p className="font-sans text-slate-400 text-xs mt-1">קולקציית אביב-קיץ 2025</p>
             </div>
             <div className="text-left">
               <p className="text-2xl font-black text-[#ee2bad]">₪{product.price.toLocaleString()}</p>
@@ -294,7 +294,7 @@ export default function ResultsPage() {
           </div>
 
           {/* Description */}
-          <p className="text-slate-400 text-sm leading-relaxed">{product.description}</p>
+          <p className="font-sans text-slate-400 text-sm leading-relaxed">{product.description}</p>
         </div>
       </main>
 

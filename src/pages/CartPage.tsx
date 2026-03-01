@@ -45,8 +45,8 @@ export default function CartPage() {
             check_circle
           </span>
         </motion.div>
-        <h2 className="text-2xl font-bold text-white" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>ההזמנה אושרה!</h2>
-        <p className="text-slate-400 mt-2 text-sm leading-relaxed">
+        <h2 className="font-display text-2xl font-bold text-white">ההזמנה אושרה!</h2>
+        <p className="font-sans text-slate-400 mt-2 text-sm leading-relaxed">
           תודה על הקנייה. תקבלו אישור במייל בקרוב.
         </p>
         <button
@@ -74,7 +74,7 @@ export default function CartPage() {
         >
           <span className="material-symbols-outlined text-slate-300">arrow_forward_ios</span>
         </button>
-        <h1 className="text-base font-bold text-white">עגלת קניות</h1>
+        <h1 className="font-display text-base font-bold text-white italic">עגלת קניות</h1>
         {state.cart.length > 0 && (
           <button
             onClick={() => state.cart.forEach((i) => dispatch({ type: 'REMOVE_FROM_CART', productId: i.product.id }))}
@@ -125,8 +125,8 @@ export default function CartPage() {
                   <div className="flex flex-1 flex-col justify-between h-24 py-1">
                     <div>
                       <span className="text-[10px] text-[#ee2bad] font-bold">{item.product.brand}</span>
-                      <h3 className="font-semibold text-sm text-white line-clamp-1">{item.product.name}</h3>
-                      <p className="text-xs text-slate-500 mt-0.5">
+                      <h3 className="font-display font-semibold text-sm text-white line-clamp-1">{item.product.name}</h3>
+                      <p className="font-sans text-xs text-slate-500 mt-0.5">
                         מידה: {item.size} | צבע: {item.color}
                       </p>
                     </div>
