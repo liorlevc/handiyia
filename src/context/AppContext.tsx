@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, type ReactNode } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, type ReactNode } from 'react';
 import type { Product } from '../data/products';
 
 export type Page = 'catalog' | 'camera' | 'results' | 'cart' | 'profile';
@@ -13,6 +13,25 @@ export interface CartItem {
 export interface UserProfile {
   name: string;
   photoUrl: string; // data URL from camera/upload
+}
+
+// ── localStorage helpers ──────────────────────────────────────────────────────
+const PROFILE_KEY = 'handiyia_profile';
+
+function loadProfile(): UserProfile | null {
+  try {
+    const raw = localStorage.getItem(PROFILE_KEY);
+    return raw ? (JSON.parse(raw) as UserProfile) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveProfile(profile: UserProfile | null) {
+  try {
+    if (profile) localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+    else localStorage.removeItem(PROFILE_KEY);
+  } catch { /* storage full or unavailable */ }
 }
 
 interface AppState {
@@ -47,16 +66,19 @@ type Action =
   | { type: 'REMOVE_FROM_CART'; productId: string }
   | { type: 'CLEAR_RESULTS' };
 
-const initialState: AppState = {
-  currentPage: 'catalog',
-  profile: null,
-  cart: [],
-  selectedProduct: null,
-  capturedPhoto: null,
-  generatedLooks: [],
-  selectedLookIndex: 0,
-  isGenerating: false,
-};
+function makeInitialState(): AppState {
+  const savedProfile = loadProfile();
+  return {
+    currentPage: 'catalog',
+    profile: savedProfile,       // ← restored from localStorage
+    cart: [],
+    selectedProduct: null,
+    capturedPhoto: null,
+    generatedLooks: [],
+    selectedLookIndex: 0,
+    isGenerating: false,
+  };
+}
 
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
@@ -133,7 +155,13 @@ interface AppContextValue {
 const AppContext = createContext<AppContextValue | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(reducer, initialState);
+  const [state, dispatch] = useReducer(reducer, undefined, makeInitialState);
+
+  // Persist profile to localStorage whenever it changes
+  useEffect(() => {
+    saveProfile(state.profile);
+  }, [state.profile]);
+
   return <AppContext.Provider value={{ state, dispatch }}>{children}</AppContext.Provider>;
 }
 

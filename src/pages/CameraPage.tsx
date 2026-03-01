@@ -214,6 +214,38 @@ export default function CameraPage() {
 
       <div className="flex-1" />
 
+      {/* "Use saved profile photo" shortcut */}
+      {state.profile?.photoUrl && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="relative z-10 mx-6 mb-2"
+        >
+          <button
+            onClick={() => {
+              cancelCountdown();
+              streamRef.current?.getTracks().forEach((t) => t.stop());
+              dispatch({ type: 'SET_CAPTURED_PHOTO', photo: state.profile!.photoUrl });
+              dispatch({ type: 'NAVIGATE', page: 'results' });
+            }}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl bg-black/50 backdrop-blur-xl border border-[#ee2bad]/40 text-white"
+          >
+            <img
+              src={state.profile.photoUrl}
+              alt="פרופיל"
+              className="w-10 h-10 rounded-full object-cover border-2 border-[#ee2bad]/60 shrink-0"
+            />
+            <div className="flex flex-col items-start text-right flex-1">
+              <span className="font-sans text-xs text-[#ee2bad] font-bold">השתמש בתמונת הפרופיל שלי</span>
+              <span className="font-sans text-[10px] text-white/50">{state.profile.name} • ללא צילום חדש</span>
+            </div>
+            <span className="material-symbols-outlined text-[#ee2bad]" style={{ fontSize: 20 }}>
+              arrow_back_ios
+            </span>
+          </button>
+        </motion.div>
+      )}
+
       {/* Bottom controls */}
       <div className="relative z-10 px-8 pb-12 flex flex-col gap-6">
         {/* Progress dots */}
@@ -257,7 +289,7 @@ export default function CameraPage() {
             </motion.div>
           </button>
 
-          {/* Flip camera (mobile extra) */}
+          {/* Flip camera */}
           <button
             onClick={flipCamera}
             className="flex flex-col items-center gap-1"
