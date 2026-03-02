@@ -12,11 +12,10 @@ import { auth, db } from '../lib/firebase';
 import type { UserProfile } from '../context/AppContext';
 
 // ── Config check ─────────────────────────────────────────────────────────────
+// Relies on firebase.ts having already validated the env vars; if auth/db are
+// null it means Firebase was intentionally skipped (missing / placeholder keys).
 function isFirebaseConfigured(): boolean {
-  return !!(
-    import.meta.env.VITE_FIREBASE_API_KEY &&
-    import.meta.env.VITE_FIREBASE_PROJECT_ID
-  );
+  return auth !== null && db !== null;
 }
 
 // ── Image compression helper ──────────────────────────────────────────────────
@@ -50,12 +49,12 @@ const userReady: Promise<User> = new Promise((res, rej) => {
   _rejectUser  = rej;
 });
 
-if (isFirebaseConfigured()) {
+if (isFirebaseConfigured() && auth) {
   onAuthStateChanged(auth, (user) => {
     if (user) {
       _resolveUser(user);
     } else {
-      signInAnonymously(auth)
+      signInAnonymously(auth!)
         .then((cred) => _resolveUser(cred.user))
         .catch(_rejectUser);
     }
@@ -72,7 +71,7 @@ export async function loadProfileRemote(): Promise<UserProfile | null> {
       userReady,
       new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), 5000)),
     ]);
-    const snap = await getDoc(doc(db, 'profiles', user.uid));
+    const snap = await getDoc(doc(db!, 'profiles', user.uid));
     if (!snap.exists()) return null;
     const data = snap.data() as UserProfile;
     return data.name ? data : null;
@@ -93,7 +92,7 @@ export async function saveProfileRemote(profile: UserProfile): Promise<void> {
     const compressedPhoto = profile.photoUrl
       ? await compressImage(profile.photoUrl)
       : '';
-    await setDoc(doc(db, 'profiles', user.uid), {
+    await setDoc(doc(db!, 'profiles', user.uid), {
       name:     profile.name,
       photoUrl: compressedPhoto,
       updatedAt: new Date().toISOString(),
@@ -109,7 +108,7 @@ export async function deleteProfileRemote(): Promise<void> {
   try {
     const { deleteDoc } = await import('firebase/firestore');
     const user = await userReady;
-    await deleteDoc(doc(db, 'profiles', user.uid));
+    await deleteDoc(doc(db!, 'profiles', user.uid));
   } catch (err) {
     console.warn('[profileService] deleteProfileRemote failed:', err);
   }
