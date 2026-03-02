@@ -41,6 +41,7 @@ export default function ResultsPage() {
   const [addedToCart, setAddedToCart] = useState(false);
   const [activeTab, setActiveTab] = useState<'ai' | 'original'>('ai');
   const [descExpanded, setDescExpanded] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
 
   // Detect missing API key
   const apiKeyMissing = !((import.meta as unknown as { env: Record<string, string> }).env?.VITE_GEMINI_API_KEY ||
@@ -183,7 +184,8 @@ export default function ResultsPage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.3 }}
-              className="absolute inset-0"
+              className="absolute inset-0 cursor-zoom-in"
+              onClick={() => setFullscreen(true)}
             >
               <img
                 src={activeTab === 'ai' ? currentLook.imageDataUrl : capturedPhoto}
@@ -194,6 +196,10 @@ export default function ResultsPage() {
               <div className="absolute top-14 right-3 glass-panel px-2.5 py-1 rounded-full text-[9px] font-bold text-white flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
                 {activeTab === 'ai' ? 'לוק AI' : 'צילום מקורי'}
+              </div>
+              {/* Expand hint */}
+              <div className="absolute bottom-12 left-3 glass-panel p-1.5 rounded-full">
+                <span className="material-symbols-outlined text-white/70" style={{ fontSize: 16 }}>open_in_full</span>
               </div>
             </motion.div>
           )}
@@ -400,6 +406,82 @@ export default function ResultsPage() {
 
         </div>
       </div>
+
+      {/* ── FULLSCREEN IMAGE MODAL ─────────────────────────────────────────── */}
+      <AnimatePresence>
+        {fullscreen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-[200] bg-black flex items-center justify-center"
+            onClick={() => setFullscreen(false)}
+          >
+            {/* Close button */}
+            <button
+              className="absolute top-4 left-4 z-10 flex items-center justify-center w-10 h-10 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white"
+              onClick={(e) => { e.stopPropagation(); setFullscreen(false); }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 22 }}>close</span>
+            </button>
+
+            {/* Scene / tab label */}
+            <div className="absolute top-4 inset-x-0 flex justify-center pointer-events-none">
+              <div className="glass-panel px-4 py-1.5 rounded-full text-xs font-bold text-white">
+                {activeTab === 'ai' ? `לוק AI — ${currentLook?.sceneLabel}` : 'צילום מקורי'}
+              </div>
+            </div>
+
+            {/* Full image */}
+            <motion.img
+              initial={{ scale: 0.92 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.92 }}
+              transition={{ duration: 0.25 }}
+              src={activeTab === 'ai' ? currentLook?.imageDataUrl : capturedPhoto}
+              alt="fullscreen look"
+              className="w-full h-full object-contain"
+              onClick={(e) => e.stopPropagation()}
+            />
+
+            {/* Scene switcher at bottom */}
+            {generatedLooks.length > 1 && (
+              <div className="absolute bottom-6 inset-x-0 flex justify-center gap-2 px-4">
+                {generatedLooks.map((look, i) => (
+                  look.imageDataUrl && (
+                    <button
+                      key={i}
+                      onClick={(e) => { e.stopPropagation(); dispatch({ type: 'SET_SELECTED_LOOK', index: i }); setActiveTab('ai'); }}
+                      className={`w-14 h-14 rounded-xl overflow-hidden border-2 transition-all ${
+                        selectedLookIndex === i ? 'border-[#ee2bad] scale-110' : 'border-white/20'
+                      }`}
+                    >
+                      <img src={look.imageDataUrl} alt={look.sceneLabel} className="w-full h-full object-cover" />
+                    </button>
+                  )
+                ))}
+              </div>
+            )}
+
+            {/* Download button */}
+            {currentLook?.imageDataUrl && (
+              <button
+                className="absolute top-4 right-4 z-10 flex items-center justify-center w-10 h-10 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const a = document.createElement('a');
+                  a.href = currentLook.imageDataUrl;
+                  a.download = `look-${product.id}.jpg`;
+                  a.click();
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 20 }}>download</span>
+              </button>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── FIXED BOTTOM: Action buttons ──────────────────────────────────── */}
       <div className="fixed bottom-[80px] inset-x-0 px-4 pt-4 pb-2 bg-gradient-to-t from-[#1a0d16] via-[#1a0d16]/95 to-transparent z-[60]">

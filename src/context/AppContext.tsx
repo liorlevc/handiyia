@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useReducer, useEffect, type ReactNode } from 'react';
 import type { Product } from '../data/products';
+import { loadProfileRemote, saveProfileRemote } from '../services/profileService';
 
 export type Page = 'catalog' | 'camera' | 'results' | 'cart' | 'profile';
 
@@ -157,10 +158,21 @@ const AppContext = createContext<AppContextValue | null>(null);
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, undefined, makeInitialState);
 
-  // Persist profile to localStorage whenever it changes
+  // ── Persist profile to localStorage on every change ───────────────────────
   useEffect(() => {
     saveProfile(state.profile);
+    // Also sync to Firebase (non-blocking, best-effort)
+    if (state.profile) saveProfileRemote(state.profile).catch(() => {});
   }, [state.profile]);
+
+  // ── On first mount: try to hydrate profile from Firebase ──────────────────
+  useEffect(() => {
+    if (state.profile) return; // already have a profile (from localStorage)
+    loadProfileRemote().then((remote) => {
+      if (remote) dispatch({ type: 'SET_PROFILE', profile: remote });
+    }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return <AppContext.Provider value={{ state, dispatch }}>{children}</AppContext.Provider>;
 }
