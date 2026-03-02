@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useApp } from '../context/AppContext';
 import { BRANDS, PRODUCTS, type Product } from '../data/products';
+import { generateQuickLook } from '../services/imagenService';
 
 const GENDER_FILTERS = [
   { id: 'all', label: 'הכל' },
@@ -15,6 +16,10 @@ export default function CatalogPage() {
   const [activeBrand, setActiveBrand] = useState<string | null>(null);
   const [activeGender, setActiveGender] = useState<'all' | 'men' | 'women'>('all');
   const [wishlist, setWishlist] = useState<Set<string>>(new Set());
+  // Quick try-on: per-product generated image URL and loading state
+  const [quickImages, setQuickImages] = useState<Record<string, string>>({});
+  const [quickLoading, setQuickLoading] = useState<Set<string>>(new Set());
+  const [quickError, setQuickError] = useState<Record<string, string>>({});
 
   const filtered = useMemo(() => {
     return PRODUCTS.filter((p) => {
@@ -48,6 +53,31 @@ export default function CatalogPage() {
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
+  };
+
+  const handleQuickTryOn = async (product: Product) => {
+    // If already generated, reset to original
+    if (quickImages[product.id]) {
+      setQuickImages((prev) => { const n = { ...prev }; delete n[product.id]; return n; });
+      setQuickError((prev) => { const n = { ...prev }; delete n[product.id]; return n; });
+      return;
+    }
+    // Need a profile photo
+    if (!state.profile?.photoUrl) {
+      dispatch({ type: 'NAVIGATE', page: 'profile' });
+      return;
+    }
+    setQuickLoading((prev) => new Set(prev).add(product.id));
+    setQuickError((prev) => { const n = { ...prev }; delete n[product.id]; return n; });
+    try {
+      const url = await generateQuickLook(state.profile.photoUrl, product);
+      setQuickImages((prev) => ({ ...prev, [product.id]: url }));
+    } catch (err) {
+      console.error('Quick try-on failed:', err);
+      setQuickError((prev) => ({ ...prev, [product.id]: 'שגיאה בייצור התמונה' }));
+    } finally {
+      setQuickLoading((prev) => { const n = new Set(prev); n.delete(product.id); return n; });
+    }
   };
 
   return (
@@ -193,23 +223,65 @@ export default function CatalogPage() {
                 >
                   {/* Image */}
                   <div className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-[#ee2bad]/5">
-                    <img
-                      src={product.image}
-                      alt={product.name}
-                      loading="lazy"
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
-                    {/* Badges */}
-                    {product.isNew && (
+                    {/* Product / generated image */}
+                    <AnimatePresence mode="wait">
+                      <motion.img
+                        key={quickImages[product.id] ? 'generated' : 'original'}
+                        src={quickImages[product.id] ?? product.image}
+                        alt={product.name}
+                        loading="lazy"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.4 }}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                    </AnimatePresence>
+
+                    {/* Loading overlay */}
+                    {quickLoading.has(product.id) && (
+                      <div className="absolute inset-0 bg-[#1a0d16]/80 backdrop-blur-sm flex flex-col items-center justify-center gap-2">
+                        <motion.div
+                          animate={{ scale: [1, 1.5, 1], opacity: [0.6, 0, 0.6] }}
+                          transition={{ duration: 1.8, repeat: Infinity }}
+                          className="absolute w-14 h-14 rounded-full bg-[#ee2bad]/30"
+                        />
+                        <span className="material-symbols-outlined text-[#ee2bad] relative z-10" style={{ fontSize: 28 }}>auto_awesome</span>
+                        <p className="font-sans text-white text-[10px] font-semibold relative z-10">מייצר לוק...</p>
+                      </div>
+                    )}
+
+                    {/* Error overlay */}
+                    {quickError[product.id] && !quickLoading.has(product.id) && (
+                      <div className="absolute inset-x-0 bottom-0 bg-red-900/80 text-red-200 text-[9px] font-semibold text-center py-1 px-2">
+                        {quickError[product.id]}
+                      </div>
+                    )}
+
+                    {/* "AI Look" badge when showing generated image */}
+                    {quickImages[product.id] && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="absolute top-2 right-2 flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#ee2bad] text-white text-[9px] font-bold"
+                      >
+                        <span className="material-symbols-outlined" style={{ fontSize: 10 }}>auto_awesome</span>
+                        לוק AI
+                      </motion.div>
+                    )}
+
+                    {/* Badges (isNew / discount) — hide when showing generated */}
+                    {!quickImages[product.id] && product.isNew && (
                       <div className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-[#ee2bad] text-white text-[10px] font-bold">
                         חדש
                       </div>
                     )}
-                    {product.originalPrice && (
+                    {!quickImages[product.id] && product.originalPrice && (
                       <div className={`absolute ${product.isNew ? 'top-8' : 'top-2'} right-2 px-2 py-0.5 rounded-full bg-amber-500 text-white text-[10px] font-bold`}>
                         {Math.round((1 - product.price / product.originalPrice) * 100)}% הנחה
                       </div>
                     )}
+
                     {/* Wishlist */}
                     <button
                       onClick={() => toggleWishlist(product.id)}
@@ -221,6 +293,22 @@ export default function CatalogPage() {
                       >
                         favorite
                       </span>
+                    </button>
+
+                    {/* Quick Try-On button — bottom of thumbnail */}
+                    <button
+                      onClick={() => handleQuickTryOn(product)}
+                      disabled={quickLoading.has(product.id)}
+                      className={`absolute bottom-0 inset-x-0 py-2 flex items-center justify-center gap-1.5 text-[10px] font-bold transition-all backdrop-blur-md
+                        ${quickImages[product.id]
+                          ? 'bg-white/20 text-white'
+                          : 'bg-[#ee2bad]/90 text-white'}
+                        ${quickLoading.has(product.id) ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: 13 }}>
+                        {quickImages[product.id] ? 'refresh' : 'person_celebrate'}
+                      </span>
+                      {quickImages[product.id] ? 'איפוס' : 'לוק מהיר עם תמונתי'}
                     </button>
                   </div>
 

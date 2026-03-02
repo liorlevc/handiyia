@@ -138,6 +138,56 @@ The result must look like a real high-end fashion photo shoot of THIS SPECIFIC P
 }
 
 /**
+ * Generates a single quick-preview image for the catalog thumbnail.
+ * Uses the product's first scene and a compact, catalog-friendly prompt.
+ */
+export async function generateQuickLook(
+  userPhotoDataUrl: string,
+  product: Product
+): Promise<string> {
+  const scene = product.scenes[0]; // street / first scene
+  const ai = getAi();
+  const userPhoto = dataUrlToBase64(userPhotoDataUrl);
+  const outfitPhoto = await fetchImageAsBase64(product.image);
+
+  const prompt = `Professional fashion catalog photo: show THIS EXACT PERSON from the first image wearing the clothing item from the second image.
+
+PRESERVE these details from the person photo exactly: face, facial hair, hair, body type, skin tone, age, ethnicity — no changes at all.
+
+Clothing: extract ONLY the garment (${product.name} by ${product.brand}) from the outfit photo — ignore any model or mannequin in that photo.
+
+Shoot style: clean editorial fashion photo, ${scene.prompt}, 3/4 or full-body shot, magazine quality, photorealistic, no text or watermarks.`;
+
+  const response = await ai.models.generateContent({
+    model: "gemini-3.1-flash-image-preview",
+    contents: [
+      {
+        role: "user",
+        parts: [
+          { inlineData: { mimeType: userPhoto.mimeType, data: userPhoto.data } },
+          { text: "PERSON PHOTO — the exact person to dress:" },
+          { inlineData: { mimeType: outfitPhoto.mimeType, data: outfitPhoto.data } },
+          { text: `OUTFIT PHOTO — extract only the garment (${product.name}):` },
+          { text: prompt },
+        ],
+      },
+    ],
+    config: { responseModalities: ["IMAGE", "TEXT"] },
+  });
+
+  const parts = response.candidates?.[0]?.content?.parts;
+  if (!parts) throw new Error("No response parts from Gemini");
+
+  for (const part of parts) {
+    if (part.inlineData?.data) {
+      return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+    }
+  }
+
+  throw new Error("No image returned in Gemini response");
+}
+
+/**
  * Generates all lifestyle looks for a product.
  * Calls onProgress after each look completes so the UI can update progressively.
  */
