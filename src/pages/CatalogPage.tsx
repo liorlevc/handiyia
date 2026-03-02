@@ -20,6 +20,8 @@ export default function CatalogPage() {
   const [quickImages, setQuickImages] = useState<Record<string, string>>({});
   const [quickLoading, setQuickLoading] = useState<Set<string>>(new Set());
   const [quickError, setQuickError] = useState<Record<string, string>>({});
+  // Fullscreen zoom viewer
+  const [zoomedImage, setZoomedImage] = useState<{ src: string; name: string } | null>(null);
 
   const filtered = useMemo(() => {
     return PRODUCTS.filter((p) => {
@@ -295,6 +297,18 @@ export default function CatalogPage() {
                       </span>
                     </button>
 
+                    {/* Zoom button — bottom-right, only when generated image is ready */}
+                    {quickImages[product.id] && (
+                      <motion.button
+                        initial={{ opacity: 0, scale: 0.7 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        onClick={() => setZoomedImage({ src: quickImages[product.id], name: product.name })}
+                        className="absolute bottom-10 left-2 p-1.5 bg-black/50 backdrop-blur-md rounded-full text-white border border-white/20 z-10"
+                      >
+                        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>zoom_in</span>
+                      </motion.button>
+                    )}
+
                     {/* Quick Try-On button — bottom of thumbnail */}
                     <button
                       onClick={() => handleQuickTryOn(product)}
@@ -343,6 +357,68 @@ export default function CatalogPage() {
           )}
         </section>
       </main>
+
+      {/* ── Fullscreen zoom viewer ───────────────────────────────────────── */}
+      <AnimatePresence>
+        {zoomedImage && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25 }}
+            className="fixed inset-0 z-[200] bg-black/95 flex flex-col"
+            onClick={() => setZoomedImage(null)}
+          >
+            {/* Top bar */}
+            <div className="flex items-center justify-between px-4 pt-4 pb-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-[#ee2bad]" style={{ fontSize: 16 }}>auto_awesome</span>
+                <span className="font-sans text-white text-sm font-bold line-clamp-1">{zoomedImage.name}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {/* Download */}
+                <button
+                  onClick={() => {
+                    const a = document.createElement('a');
+                    a.href = zoomedImage.src;
+                    a.download = `ai-look-${Date.now()}.jpg`;
+                    a.click();
+                  }}
+                  className="flex items-center justify-center w-9 h-9 rounded-full bg-white/10 text-white"
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 20 }}>download</span>
+                </button>
+                {/* Close */}
+                <button
+                  onClick={() => setZoomedImage(null)}
+                  className="flex items-center justify-center w-9 h-9 rounded-full bg-white/10 text-white"
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 20 }}>close</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Image */}
+            <div className="flex-1 flex items-center justify-center p-4 overflow-hidden">
+              <motion.img
+                src={zoomedImage.src}
+                alt={zoomedImage.name}
+                initial={{ scale: 0.85, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.85, opacity: 0 }}
+                transition={{ duration: 0.3, ease: 'easeOut' }}
+                className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+
+            {/* Tap anywhere hint */}
+            <p className="text-center text-white/30 text-xs pb-6 font-sans shrink-0">
+              הקש בכל מקום לסגירה
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
