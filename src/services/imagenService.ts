@@ -9,10 +9,24 @@ import type { GeneratedLookState } from "../context/AppContext";
 
 let aiInstance: GoogleGenAI | null = null;
 
+function getApiKey(): string {
+  // Standard Vite env var (VITE_ prefix = auto-exposed to browser)
+  const viteKey = (import.meta as unknown as { env: Record<string, string> }).env?.VITE_GEMINI_API_KEY;
+  // Legacy build-time injection via vite.config define
+  const legacyKey = typeof process !== 'undefined' ? (process.env?.GEMINI_API_KEY ?? '') : '';
+  const key = viteKey || legacyKey || '';
+  if (!key) {
+    console.error(
+      '[Handiyia] GEMINI_API_KEY is not set. ' +
+      'Set VITE_GEMINI_API_KEY in your Render environment variables and redeploy.'
+    );
+  }
+  return key;
+}
+
 function getAi() {
   if (!aiInstance) {
-    const apiKey = process.env.GEMINI_API_KEY || '';
-    aiInstance = new GoogleGenAI({ apiKey });
+    aiInstance = new GoogleGenAI({ apiKey: getApiKey() });
   }
   return aiInstance;
 }

@@ -42,6 +42,10 @@ export default function ResultsPage() {
   const [activeTab, setActiveTab] = useState<'ai' | 'original'>('ai');
   const [descExpanded, setDescExpanded] = useState(false);
 
+  // Detect missing API key
+  const apiKeyMissing = !((import.meta as unknown as { env: Record<string, string> }).env?.VITE_GEMINI_API_KEY ||
+    (typeof process !== 'undefined' && process.env?.GEMINI_API_KEY));
+
   // Start generation when page mounts
   useEffect(() => {
     if (!product || !capturedPhoto || generatedLooks.length > 0) return;
@@ -143,22 +147,34 @@ export default function ResultsPage() {
                 alt="צילום"
                 className="absolute inset-0 w-full h-full object-cover opacity-15 blur-sm"
               />
-              <div className="relative z-10 flex flex-col items-center gap-3">
-                <div className="relative w-16 h-16 flex items-center justify-center">
-                  <motion.div
-                    animate={{ scale: [1, 1.6, 1], opacity: [0.5, 0, 0.5] }}
-                    transition={{ duration: 2, repeat: Infinity }}
-                    className="absolute w-16 h-16 rounded-full bg-[#ee2bad]/25"
-                  />
-                  <motion.div
-                    animate={{ scale: [1, 1.3, 1], opacity: [0.7, 0.1, 0.7] }}
-                    transition={{ duration: 2, repeat: Infinity, delay: 0.4 }}
-                    className="absolute w-10 h-10 rounded-full bg-[#ee2bad]/35"
-                  />
-                  <span className="material-symbols-outlined text-[#ee2bad]" style={{ fontSize: 32 }}>auto_awesome</span>
-                </div>
-                <p className="font-sans text-white/70 text-sm font-semibold">AI יוצר את הלוק שלך...</p>
-                <p className="font-sans text-white/35 text-xs">אנחנו מלבישים אותך על {currentLook?.sceneLabel}</p>
+              <div className="relative z-10 flex flex-col items-center gap-3 px-6 text-center">
+                {apiKeyMissing ? (
+                  <>
+                    <span className="material-symbols-outlined text-red-400" style={{ fontSize: 40 }}>key_off</span>
+                    <p className="font-sans text-red-300 text-sm font-semibold">מפתח API חסר</p>
+                    <p className="font-sans text-red-400/70 text-xs leading-relaxed">
+                      הגדר את <code className="bg-red-900/40 px-1 rounded">VITE_GEMINI_API_KEY</code> בהגדרות הסביבה של Render ופרס מחדש.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <div className="relative w-16 h-16 flex items-center justify-center">
+                      <motion.div
+                        animate={{ scale: [1, 1.6, 1], opacity: [0.5, 0, 0.5] }}
+                        transition={{ duration: 2, repeat: Infinity }}
+                        className="absolute w-16 h-16 rounded-full bg-[#ee2bad]/25"
+                      />
+                      <motion.div
+                        animate={{ scale: [1, 1.3, 1], opacity: [0.7, 0.1, 0.7] }}
+                        transition={{ duration: 2, repeat: Infinity, delay: 0.4 }}
+                        className="absolute w-10 h-10 rounded-full bg-[#ee2bad]/35"
+                      />
+                      <span className="material-symbols-outlined text-[#ee2bad]" style={{ fontSize: 32 }}>auto_awesome</span>
+                    </div>
+                    <p className="font-sans text-white/70 text-sm font-semibold">AI יוצר את הלוק שלך...</p>
+                    <p className="font-sans text-white/35 text-xs">אנחנו מלבישים אותך על {currentLook?.sceneLabel}</p>
+                  </>
+                )}
               </div>
             </motion.div>
           ) : (
